@@ -1,0 +1,12 @@
+[Unit]
+Description=gotimekpr screen time tracker
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/gotimekpr daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
