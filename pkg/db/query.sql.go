@@ -61,7 +61,7 @@ func (q *Queries) GetDurationForToday(ctx context.Context) (GetDurationForTodayR
 
 const getLimits = `-- name: GetLimits :many
 SELECT
-    id, weekday, duration_ms, created_at, updated_at
+    id, weekday, limit_sec, created_at, updated_at
 FROM
     limits
 `
@@ -78,7 +78,7 @@ func (q *Queries) GetLimits(ctx context.Context) ([]Limit, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.Weekday,
-			&i.DurationMs,
+			&i.LimitSec,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

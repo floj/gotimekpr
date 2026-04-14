@@ -61,19 +61,17 @@ func cmdDaemon() *cli.Command {
 				limitMap[limit.Weekday] = limit
 			}
 
-			ticker := time.NewTicker(conf.Interval)
+			ticker := time.NewTicker(time.Duration(conf.IntervalSec) * time.Second)
 			defer ticker.Stop()
 
 			weekday := time.Now().Weekday()
 
 			lastRec := db.Tracking{ID: -1}
 
-			limitToday := float64(-1)
+			limitSecToday := int64(-1)
 			if limit, ok := limitMap[int64(weekday)]; ok {
-				limitToday = float64(limit.DurationMs)
+				limitSecToday = limit.LimitSec
 			}
-
-			notifyBefore := float64(conf.NotifyBefore.Milliseconds())
 
 			for {
 				select {
@@ -109,7 +107,7 @@ func cmdDaemon() *cli.Command {
 					lastRec = rec
 					slog.Debug("updated tracking", "id", rec.ID, "duration_ms", rec.DurationMs)
 
-					if limitToday < 0 {
+					if limitSecToday < 0 {
 						slog.Debug("no limit for today")
 						continue
 					}
@@ -124,15 +122,12 @@ func cmdDaemon() *cli.Command {
 						continue
 					}
 
-					used := dur.Total.Float64
-					remaining := limitToday - used
-					remainingSec := max(int(remaining/1000), 0)
-					limitTodaySec := int(limitToday / 1000)
-					usedSec := int(used / 1000)
+					usedSec := int64(dur.Total.Float64 / 1000)
+					remainingSec := max(limitSecToday-usedSec, 0)
 
-					slog.Debug("duration for today", "limit", limitTodaySec, "used", usedSec, "remaining", remainingSec)
+					slog.Debug("duration for today", "limit", limitSecToday, "used", usedSec, "remaining", remainingSec)
 
-					if remaining > notifyBefore {
+					if remainingSec > conf.NotifyBeforeSec {
 						slog.Debug("under limit, no notification")
 						continue
 					}
@@ -142,7 +137,7 @@ func cmdDaemon() *cli.Command {
 						slog.Error("failed to send notification", "error", err)
 					}
 
-					if remaining < 0 {
+					if remainingSec == 0 {
 						de.SendNotification("You've exceeded your screen time limit for today!")
 						if noLogout {
 							slog.Info("no-logout flag is set, not logging out user")

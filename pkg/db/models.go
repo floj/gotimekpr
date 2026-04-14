@@ -9,11 +9,11 @@ import (
 )
 
 type Limit struct {
-	ID         int64
-	Weekday    int64
-	DurationMs int64
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID        int64
+	Weekday   int64
+	LimitSec  int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Tracking struct {
