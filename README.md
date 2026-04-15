@@ -2,6 +2,18 @@
 
 A screen time tracking and limiting daemon for Linux desktops, inspired by [timekpr-next](https://launchpad.net/timekpr-next). It monitors active screen usage and enforces configurable daily time limits per weekday, logging out users when their allocated time is exceeded.
 
+## Motivation
+
+I used [timekpr-next](https://launchpad.net/timekpr-next) to limit my 13-year-old's screen time. He's really into Minecraft and recently heard that Bazzite Linux is *the* best distro for gaming. Being the supportive dad I am, I encouraged him to try it out, and we installed it on his PC. Father of the year, right?
+
+Plot twist: Bazzite is based on ostree, and there's no easy way to install timekpr-next. So in a classic case of "I'll just write my own," I spent some hours building a stripped-down version of timekpr-next in Go. It runs entirely out of the user's home directory and keeps all its state there. No root required and works nicely with ostree's read-only root fs. Peak parental engineering.
+
+Now, if he figures out that he can:
+- stop the systemd user service himself
+- tweak the limits via the CLI or just go full hacker mode with `sqlite3`
+
+...then honestly, it's fine and I'll be proud he figured it out. But until that day comes, the screen time throne is mine again.
+
 ## Features
 
 - Per-weekday screen time limits with per-date overrides
