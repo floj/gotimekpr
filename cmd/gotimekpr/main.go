@@ -28,6 +28,7 @@ func main() {
 			cmdLimits(),
 			cmdUsage(),
 			cmdInstall(),
+			cmdVersion(),
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			lvl := slog.LevelInfo

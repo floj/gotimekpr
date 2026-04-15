@@ -13,39 +13,37 @@ import (
 
 func cmdLimits() *cli.Command {
 	return &cli.Command{
-		Name:  "limits",
-		Usage: "manage limits",
+		Name:    "limits",
+		Aliases: []string{"l"},
+		Usage:   "retrieves today's limit",
+		Action: func(ctx context.Context, c *cli.Command) error {
+			conf, err := config.LoadConfig()
+			if err != nil {
+				return err
+			}
+			dbq, db, err := db.Open(ctx, conf)
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			limit, err := dbq.GetDateLimitToday(ctx)
+
+			if err == nil {
+				fmt.Printf("limit for today: %s\n", time.Duration(limit.LimitMinutes)*time.Minute)
+				return nil
+			}
+			if err == sql.ErrNoRows {
+				fmt.Println("no limit set for today")
+				return nil
+			}
+			return err
+		},
 		Commands: []*cli.Command{
 			{
-				Name:  "get",
-				Usage: "retrieves today's limit",
-				Action: func(ctx context.Context, c *cli.Command) error {
-					conf, err := config.LoadConfig()
-					if err != nil {
-						return err
-					}
-					dbq, db, err := db.Open(ctx, conf)
-					if err != nil {
-						return err
-					}
-					defer db.Close()
-
-					limit, err := dbq.GetDateLimitToday(ctx)
-
-					if err == nil {
-						fmt.Printf("limit for today: %s\n", time.Duration(limit.LimitMinutes)*time.Minute)
-						return nil
-					}
-					if err == sql.ErrNoRows {
-						fmt.Println("no limit set for today")
-						return nil
-					}
-					return err
-				},
-			},
-			{
-				Name:  "add",
-				Usage: "adds additional time to todays limit",
+				Name:    "add",
+				Aliases: []string{"a"},
+				Usage:   "adds additional time to todays limit",
 				Arguments: []cli.Argument{
 					&cli.StringArg{
 						Name:      "duration",
@@ -79,8 +77,9 @@ func cmdLimits() *cli.Command {
 				},
 			},
 			{
-				Name:  "set",
-				Usage: "sets today's limit to a specific duration",
+				Name:    "set",
+				Aliases: []string{"s"},
+				Usage:   "sets today's limit to a specific duration",
 				Arguments: []cli.Argument{
 					&cli.StringArg{
 						Name:      "duration",

@@ -67,8 +67,9 @@ func cmdInstall() *cli.Command {
 	}
 
 	return &cli.Command{
-		Name:  "install",
-		Usage: "installs the gotimekpr systemd user service and starts it",
+		Name:    "install",
+		Aliases: []string{"i"},
+		Usage:   "installs the gotimekpr systemd user service and starts it",
 		Action: func(ctx context.Context, c *cli.Command) error {
 			if err := copyBin(); err != nil {
 				return err

@@ -74,8 +74,9 @@ func cmdUsage() *cli.Command {
 	}
 
 	return &cli.Command{
-		Name:  "usage",
-		Usage: "shows today's usage and limit",
+		Name:    "usage",
+		Aliases: []string{"u"},
+		Usage:   "shows today's usage and limit",
 		Action: func(ctx context.Context, c *cli.Command) error {
 			conf, err := config.LoadConfig()
 			if err != nil {
