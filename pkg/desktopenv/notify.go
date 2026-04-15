@@ -16,10 +16,10 @@ func (d *DesktopEnv) SendNotification(text string) error {
 	call := obj.Call(
 		notifyDbusInterface+".Notify",
 		0,
-		"gokpr-bazite",       // app_name
+		"Screentime limit",   // app_name
 		d.lastNotificationID, // replaces_id
 		"",                   // app_icon (empty = default)
-		"Screen Time Alert",  // summary
+		"Screentime Alert",   // summary
 		text,                 // body
 		[]string{},           // actions
 		map[string]dbus.Variant{ // hints
