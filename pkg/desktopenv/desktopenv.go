@@ -9,15 +9,6 @@ type DesktopEnv struct {
 	lastNotificationID uint32
 }
 
-func New() (*DesktopEnv, error) {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		return nil, err
-	}
-
+func New(conn *dbus.Conn) (*DesktopEnv, error) {
 	return &DesktopEnv{conn: conn}, nil
-}
-
-func (d *DesktopEnv) Close() {
-	d.conn.Close()
 }

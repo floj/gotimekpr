@@ -3,12 +3,14 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Config struct {
-	DBURL           string `yaml:"db_url"`
-	IntervalSec     int64  `yaml:"interval"`
-	NotifyBeforeSec int64  `yaml:"notify_before"`
+	DBURL            string        `yaml:"db_url"`
+	TrackingInterval time.Duration `yaml:"tracking_interval"`
+	NotifyBefore     time.Duration `yaml:"notify_before"`
+	NoLogout         bool          `yaml:"no_logout"`
 }
 
 func LoadConfig() (Config, error) {
@@ -21,8 +23,8 @@ func LoadConfig() (Config, error) {
 	os.MkdirAll(dbDir, 0750)
 	dbURL := "file:" + filepath.Join(dbDir, "gotimekpr.db") + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	return Config{
-		DBURL:           dbURL,
-		IntervalSec:     5,
-		NotifyBeforeSec: 60,
+		DBURL:            dbURL,
+		TrackingInterval: 3 * time.Second,
+		NotifyBefore:     1 * time.Minute,
 	}, nil
 }
