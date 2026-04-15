@@ -10,7 +10,7 @@ import (
 
 type DateLimit struct {
 	ID           int64
-	Date         time.Time
+	LimitDate    time.Time
 	LimitMinutes int64
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

@@ -25,6 +25,8 @@ func main() {
 		Usage: "timekpr-next like app written in Go",
 		Commands: []*cli.Command{
 			cmdDaemon(),
+			cmdLimits(),
+			cmdUsage(),
 		},
 	}
 

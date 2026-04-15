@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS weekday_limits (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-
 -- daily limits for each weekday, -1 means no limit, weekday 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 INSERT INTO
     weekday_limits (weekday, limit_minutes)
@@ -36,7 +35,7 @@ VALUES
 
 CREATE TABLE IF NOT EXISTS date_limits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date DATE NOT NULL UNIQUE,
+    limit_date DATE NOT NULL UNIQUE,
     limit_minutes INTEGER NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

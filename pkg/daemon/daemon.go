@@ -87,14 +87,14 @@ func (d *Daemon) track(lastRec db.Tracking) (db.Tracking, error) {
 	return rec, nil
 }
 
-func (d *Daemon) checkUsage() (usage, error) {
+func (d *Daemon) checkUsage() (Usage, error) {
 	limit := d.getTodaysLimit()
 
-	usg := usage{
-		exceeded:  false,
-		used:      0,
-		limit:     limit,
-		remaining: limit,
+	usg := Usage{
+		Exceeded:  false,
+		Limit:     limit,
+		Used:      0,
+		Remaining: -1,
 	}
 
 	dur, err := d.dbq.GetDurationForToday(d.ctx)
@@ -107,25 +107,33 @@ func (d *Daemon) checkUsage() (usage, error) {
 		return usg, nil
 	}
 
-	usg.used = time.Duration(int64(dur.Total.Float64)) * time.Millisecond
-	usg.remaining = max(limit-usg.used, 0)
-	usg.exceeded = usg.remaining <= 0
+	usg.Used = time.Duration(int64(dur.Total.Float64)) * time.Second
+	if limit < 0 {
+		return usg, nil
+	}
+	usg.Remaining = max(limit-usg.Used, 0)
+	usg.Exceeded = usg.Remaining <= 0
 
-	slog.Debug("usage today", "used", usg.used, "remaining", usg.remaining, "limit", limit)
 	return usg, nil
 }
 
 func (d *Daemon) getTodaysLimit() time.Duration {
-	dateLimit, err := d.dbq.GetDateLimit(d.ctx)
+	dateLimit, err := d.dbq.GetDateLimitToday(d.ctx)
 	if err == nil {
+		if dateLimit.LimitMinutes < 0 {
+			return -1
+		}
 		return time.Duration(dateLimit.LimitMinutes) * time.Minute
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		slog.Error("failed to get date limit, falling back to weekday limit", "error", err)
 	}
 
-	weekdayLimit, err := d.dbq.GetWeekdayLimit(d.ctx)
+	weekdayLimit, err := d.dbq.GetWeekdayLimitToday(d.ctx)
 	if err == nil {
+		if weekdayLimit.LimitMinutes < 0 {
+			return -1
+		}
 		return time.Duration(weekdayLimit.LimitMinutes) * time.Minute
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -136,11 +144,11 @@ func (d *Daemon) getTodaysLimit() time.Duration {
 	return -1
 }
 
-type usage struct {
-	exceeded  bool
-	used      time.Duration
-	limit     time.Duration
-	remaining time.Duration
+type Usage struct {
+	Exceeded  bool
+	Used      time.Duration
+	Limit     time.Duration
+	Remaining time.Duration
 }
 
 func (d *Daemon) Run() error {
@@ -163,8 +171,13 @@ func (d *Daemon) Run() error {
 				slog.Error("error checking limit", "error", err)
 				continue
 			}
+			slog.Debug("current usage", "used", usg.Used, "remaining", usg.Remaining, "limit", usg.Limit)
 
-			if usg.exceeded {
+			if usg.Limit < 0 {
+				continue
+			}
+
+			if usg.Exceeded {
 				d.de.SendNotification("You've exceeded your screen time limit for today!")
 				if d.conf.NoLogout {
 					slog.Info("no-logout flag is set, not logging out user")
@@ -178,9 +191,9 @@ func (d *Daemon) Run() error {
 				continue
 			}
 
-			if usg.remaining < d.conf.NotifyBefore {
-				slog.Info("limit approaching, sending notification", "remaining", usg.remaining)
-				if err := d.de.SendNotification(fmt.Sprintf("%s remaining - you're close to your screen time limit for today.", usg.remaining)); err != nil {
+			if usg.Remaining < d.conf.NotifyBefore {
+				slog.Info("limit approaching, sending notification", "remaining", usg.Remaining)
+				if err := d.de.SendNotification(fmt.Sprintf("%s remaining - you're close to your screen time limit for today.", usg.Remaining)); err != nil {
 					slog.Error("failed to send notification", "error", err)
 				}
 			}

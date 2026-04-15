@@ -22,7 +22,7 @@ FROM
 WHERE
     DATE(created_at) = DATE('now');
 
--- name: GetWeekdayLimit :one
+-- name: GetWeekdayLimitToday :one
 SELECT
     *
 FROM
@@ -30,10 +30,36 @@ FROM
 WHERE
     weekday = strftime('%w', 'now');
 
--- name: GetDateLimit :one
+-- name: GetDateLimitToday :one
 SELECT
     *
 FROM
     date_limits
 WHERE
-    date = DATE('now');
+    DATE(limit_date) = DATE('now');
+
+-- name: AddToDateLimitToday :one
+INSERT INTO
+    date_limits(limit_date, limit_minutes)
+VALUES
+    (DATE('now'), ?) ON CONFLICT(limit_date) DO
+UPDATE
+SET
+    limit_minutes = limit_minutes + excluded.limit_minutes,
+    updated_at = CURRENT_TIMESTAMP RETURNING *;
+
+-- name: SetDateLimitToday :one
+INSERT INTO
+    date_limits(limit_date, limit_minutes)
+VALUES
+    (DATE('now'), ?) ON CONFLICT(limit_date) DO
+UPDATE
+SET
+    limit_minutes = excluded.limit_minutes,
+    updated_at = CURRENT_TIMESTAMP RETURNING *;
+
+-- name: RemoveDateLimitToday :exec
+DELETE FROM
+    date_limits
+WHERE
+    DATE(limit_date) = DATE('now');

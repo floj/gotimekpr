@@ -10,21 +10,45 @@ import (
 	"database/sql"
 )
 
-const getDateLimit = `-- name: GetDateLimit :one
-SELECT
-    id, date, limit_minutes, created_at, updated_at
-FROM
-    date_limits
-WHERE
-    date = DATE('now')
+const addToDateLimitToday = `-- name: AddToDateLimitToday :one
+INSERT INTO
+    date_limits(limit_date, limit_minutes)
+VALUES
+    (DATE('now'), ?) ON CONFLICT(limit_date) DO
+UPDATE
+SET
+    limit_minutes = limit_minutes + excluded.limit_minutes,
+    updated_at = CURRENT_TIMESTAMP RETURNING id, limit_date, limit_minutes, created_at, updated_at
 `
 
-func (q *Queries) GetDateLimit(ctx context.Context) (DateLimit, error) {
-	row := q.db.QueryRowContext(ctx, getDateLimit)
+func (q *Queries) AddToDateLimitToday(ctx context.Context, limitMinutes int64) (DateLimit, error) {
+	row := q.db.QueryRowContext(ctx, addToDateLimitToday, limitMinutes)
 	var i DateLimit
 	err := row.Scan(
 		&i.ID,
-		&i.Date,
+		&i.LimitDate,
+		&i.LimitMinutes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getDateLimitToday = `-- name: GetDateLimitToday :one
+SELECT
+    id, limit_date, limit_minutes, created_at, updated_at
+FROM
+    date_limits
+WHERE
+    DATE(limit_date) = DATE('now')
+`
+
+func (q *Queries) GetDateLimitToday(ctx context.Context) (DateLimit, error) {
+	row := q.db.QueryRowContext(ctx, getDateLimitToday)
+	var i DateLimit
+	err := row.Scan(
+		&i.ID,
+		&i.LimitDate,
 		&i.LimitMinutes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -54,7 +78,7 @@ func (q *Queries) GetDurationForToday(ctx context.Context) (GetDurationForTodayR
 	return i, err
 }
 
-const getWeekdayLimit = `-- name: GetWeekdayLimit :one
+const getWeekdayLimitToday = `-- name: GetWeekdayLimitToday :one
 SELECT
     id, weekday, limit_minutes, updated_at
 FROM
@@ -63,8 +87,8 @@ WHERE
     weekday = strftime('%w', 'now')
 `
 
-func (q *Queries) GetWeekdayLimit(ctx context.Context) (WeekdayLimit, error) {
-	row := q.db.QueryRowContext(ctx, getWeekdayLimit)
+func (q *Queries) GetWeekdayLimitToday(ctx context.Context) (WeekdayLimit, error) {
+	row := q.db.QueryRowContext(ctx, getWeekdayLimitToday)
 	var i WeekdayLimit
 	err := row.Scan(
 		&i.ID,
@@ -88,6 +112,42 @@ func (q *Queries) NewTrackingRecord(ctx context.Context) (Tracking, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.DurationSec,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const removeDateLimitToday = `-- name: RemoveDateLimitToday :exec
+DELETE FROM
+    date_limits
+WHERE
+    DATE(limit_date) = DATE('now')
+`
+
+func (q *Queries) RemoveDateLimitToday(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, removeDateLimitToday)
+	return err
+}
+
+const setDateLimitToday = `-- name: SetDateLimitToday :one
+INSERT INTO
+    date_limits(limit_date, limit_minutes)
+VALUES
+    (DATE('now'), ?) ON CONFLICT(limit_date) DO
+UPDATE
+SET
+    limit_minutes = excluded.limit_minutes,
+    updated_at = CURRENT_TIMESTAMP RETURNING id, limit_date, limit_minutes, created_at, updated_at
+`
+
+func (q *Queries) SetDateLimitToday(ctx context.Context, limitMinutes int64) (DateLimit, error) {
+	row := q.db.QueryRowContext(ctx, setDateLimitToday, limitMinutes)
+	var i DateLimit
+	err := row.Scan(
+		&i.ID,
+		&i.LimitDate,
+		&i.LimitMinutes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
