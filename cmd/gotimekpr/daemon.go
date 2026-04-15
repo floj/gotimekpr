@@ -33,7 +33,7 @@ func cmdDaemon() *cli.Command {
 				return err
 			}
 			defer d.Close()
-			return d.Run(ctx)
+			return d.Run()
 		},
 	}
 }

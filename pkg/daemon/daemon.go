@@ -16,6 +16,7 @@ import (
 
 type Daemon struct {
 	conf config.Config
+	ctx  context.Context
 	conn *dbus.Conn
 	db   *sql.DB
 	dbq  *db.Queries
@@ -41,6 +42,7 @@ func NewDaemon(ctx context.Context, conf config.Config) (*Daemon, error) {
 
 	return &Daemon{
 		conf: conf,
+		ctx:  ctx,
 		conn: conn,
 		db:   db,
 		dbq:  dbq,
@@ -62,14 +64,14 @@ func (d *Daemon) Close() error {
 	return errors.Join(errs...)
 }
 
-func (d *Daemon) track(ctx context.Context, lastRec db.Tracking) (db.Tracking, error) {
+func (d *Daemon) track(lastRec db.Tracking) (db.Tracking, error) {
 	if d.de.IsScreenLocked() {
 		slog.Debug("not tracking this time")
 		return db.Tracking{ID: -1}, nil
 	}
 
 	if lastRec.ID < 0 {
-		rec, err := d.dbq.InsertTrackingRecord(ctx)
+		rec, err := d.dbq.NewTrackingRecord(d.ctx)
 		if err != nil {
 			return lastRec, fmt.Errorf("error adding new tracking record: %w", err)
 		}
@@ -77,11 +79,7 @@ func (d *Daemon) track(ctx context.Context, lastRec db.Tracking) (db.Tracking, e
 		return rec, nil
 	}
 
-	duration := time.Since(lastRec.UpdatedAt)
-	rec, err := d.dbq.AddTrackingRecordDuration(ctx, db.AddTrackingRecordDurationParams{
-		ID:         lastRec.ID,
-		DurationMs: duration.Milliseconds(),
-	})
+	rec, err := d.dbq.UpdateTrackingDuration(d.ctx, lastRec.ID)
 	if err != nil {
 		return lastRec, fmt.Errorf("error updating tracking record: %w", err)
 	}
@@ -89,67 +87,84 @@ func (d *Daemon) track(ctx context.Context, lastRec db.Tracking) (db.Tracking, e
 	return rec, nil
 }
 
-func (d *Daemon) checkLimitExceeded(ctx context.Context, limit time.Duration) (bool, time.Duration, error) {
-	if limit < 0 {
-		slog.Debug("no limit for today")
-		return false, -1, nil
+func (d *Daemon) checkUsage() (usage, error) {
+	limit := d.getTodaysLimit()
+
+	usg := usage{
+		exceeded:  false,
+		used:      0,
+		limit:     limit,
+		remaining: limit,
 	}
 
-	dur, err := d.dbq.GetDurationForToday(ctx)
+	dur, err := d.dbq.GetDurationForToday(d.ctx)
 	if err != nil {
-		return false, -1, fmt.Errorf("failed to get duration for today: %w", err)
+		return usg, fmt.Errorf("failed to get duration for today: %w", err)
 	}
+
 	if dur.Count == 0 {
 		slog.Info("no tracking records for today")
-		return false, limit, nil
+		return usg, nil
 	}
 
-	used := time.Duration(int64(dur.Total.Float64)) * time.Millisecond
-	remaining := limit - used
+	usg.used = time.Duration(int64(dur.Total.Float64)) * time.Millisecond
+	usg.remaining = max(limit-usg.used, 0)
+	usg.exceeded = usg.remaining <= 0
 
-	slog.Debug("duration for today", "limit", limit, "used", used, "remaining", remaining)
-	return remaining <= 0, max(remaining, 0), nil
+	slog.Debug("usage today", "used", usg.used, "remaining", usg.remaining, "limit", limit)
+	return usg, nil
 }
 
-func (d *Daemon) Run(ctx context.Context) error {
-
-	limits, err := d.dbq.GetLimits(ctx)
-	if err != nil {
-		return err
+func (d *Daemon) getTodaysLimit() time.Duration {
+	dateLimit, err := d.dbq.GetDateLimit(d.ctx)
+	if err == nil {
+		return time.Duration(dateLimit.LimitMinutes) * time.Minute
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		slog.Error("failed to get date limit, falling back to weekday limit", "error", err)
 	}
 
-	limitMap := map[int64]db.Limit{}
-	for _, limit := range limits {
-		limitMap[limit.Weekday] = limit
+	weekdayLimit, err := d.dbq.GetWeekdayLimit(d.ctx)
+	if err == nil {
+		return time.Duration(weekdayLimit.LimitMinutes) * time.Minute
 	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		slog.Error("failed to get weekday limit, using no limit", "error", err)
+		return -1
+	}
+	slog.Debug("no weekday limit set for today, using no limit")
+	return -1
+}
 
+type usage struct {
+	exceeded  bool
+	used      time.Duration
+	limit     time.Duration
+	remaining time.Duration
+}
+
+func (d *Daemon) Run() error {
 	ticker := time.NewTicker(d.conf.TrackingInterval)
 	defer ticker.Stop()
 
-	weekday := time.Now().Weekday()
-
-	var limitToday time.Duration = -1
-	if limit, ok := limitMap[int64(weekday)]; ok {
-		limitToday = time.Duration(limit.LimitSec) * time.Second
-	}
-
 	lastRec := db.Tracking{ID: -1}
+	var err error
 	for {
 		select {
 		case <-ticker.C:
-			lastRec, err = d.track(ctx, lastRec)
+			lastRec, err = d.track(lastRec)
 			if err != nil {
 				slog.Error("error tracking time", "error", err)
 				continue
 			}
 
-			exceeded, remaining, err := d.checkLimitExceeded(ctx, limitToday)
+			usg, err := d.checkUsage()
 			if err != nil {
 				slog.Error("error checking limit", "error", err)
 				continue
 			}
 
-			if exceeded {
+			if usg.exceeded {
 				d.de.SendNotification("You've exceeded your screen time limit for today!")
 				if d.conf.NoLogout {
 					slog.Info("no-logout flag is set, not logging out user")
@@ -163,13 +178,13 @@ func (d *Daemon) Run(ctx context.Context) error {
 				continue
 			}
 
-			if remaining < d.conf.NotifyBefore {
-				slog.Info("limit approaching, sending notification", "remaining", remaining)
-				if err := d.de.SendNotification(fmt.Sprintf("%s remaining - you're close to your screen time limit for today.", remaining)); err != nil {
+			if usg.remaining < d.conf.NotifyBefore {
+				slog.Info("limit approaching, sending notification", "remaining", usg.remaining)
+				if err := d.de.SendNotification(fmt.Sprintf("%s remaining - you're close to your screen time limit for today.", usg.remaining)); err != nil {
 					slog.Error("failed to send notification", "error", err)
 				}
 			}
-		case <-ctx.Done():
+		case <-d.ctx.Done():
 			slog.Info("shutting down daemon")
 			return nil
 		}

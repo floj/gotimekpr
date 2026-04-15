@@ -1,14 +1,14 @@
--- name: InsertTrackingRecord :one
+-- name: NewTrackingRecord :one
 INSERT INTO
     tracking(created_at, updated_at)
 VALUES
     (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *;
 
--- name: AddTrackingRecordDuration :one
+-- name: UpdateTrackingDuration :one
 UPDATE
     tracking
 SET
-    duration_ms = duration_ms + ?,
+    duration_sec = unixepoch('now') - unixepoch(created_at),
     updated_at = CURRENT_TIMESTAMP
 WHERE
     id = ? RETURNING *;
@@ -16,14 +16,24 @@ WHERE
 -- name: GetDurationForToday :one
 SELECT
     COUNT(id) AS count,
-    SUM(duration_ms) AS total
+    SUM(duration_sec) AS total
 FROM
     tracking
 WHERE
     DATE(created_at) = DATE('now');
 
--- name: GetLimits :many
+-- name: GetWeekdayLimit :one
 SELECT
     *
 FROM
-    limits;
+    weekday_limits
+WHERE
+    weekday = strftime('%w', 'now');
+
+-- name: GetDateLimit :one
+SELECT
+    *
+FROM
+    date_limits
+WHERE
+    date = DATE('now');

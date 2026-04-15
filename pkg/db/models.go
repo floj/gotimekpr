@@ -8,17 +8,24 @@ import (
 	"time"
 )
 
-type Limit struct {
-	ID        int64
-	Weekday   int64
-	LimitSec  int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
+type DateLimit struct {
+	ID           int64
+	Date         time.Time
+	LimitMinutes int64
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type Tracking struct {
-	ID         int64
-	DurationMs int64
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID          int64
+	DurationSec int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type WeekdayLimit struct {
+	ID           int64
+	Weekday      int64
+	LimitMinutes int64
+	UpdatedAt    time.Time
 }

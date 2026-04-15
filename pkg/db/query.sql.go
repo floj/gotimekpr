@@ -10,27 +10,22 @@ import (
 	"database/sql"
 )
 
-const addTrackingRecordDuration = `-- name: AddTrackingRecordDuration :one
-UPDATE
-    tracking
-SET
-    duration_ms = duration_ms + ?,
-    updated_at = CURRENT_TIMESTAMP
+const getDateLimit = `-- name: GetDateLimit :one
+SELECT
+    id, date, limit_minutes, created_at, updated_at
+FROM
+    date_limits
 WHERE
-    id = ? RETURNING id, duration_ms, created_at, updated_at
+    date = DATE('now')
 `
 
-type AddTrackingRecordDurationParams struct {
-	DurationMs int64
-	ID         int64
-}
-
-func (q *Queries) AddTrackingRecordDuration(ctx context.Context, arg AddTrackingRecordDurationParams) (Tracking, error) {
-	row := q.db.QueryRowContext(ctx, addTrackingRecordDuration, arg.DurationMs, arg.ID)
-	var i Tracking
+func (q *Queries) GetDateLimit(ctx context.Context) (DateLimit, error) {
+	row := q.db.QueryRowContext(ctx, getDateLimit)
+	var i DateLimit
 	err := row.Scan(
 		&i.ID,
-		&i.DurationMs,
+		&i.Date,
+		&i.LimitMinutes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -40,7 +35,7 @@ func (q *Queries) AddTrackingRecordDuration(ctx context.Context, arg AddTracking
 const getDurationForToday = `-- name: GetDurationForToday :one
 SELECT
     COUNT(id) AS count,
-    SUM(duration_ms) AS total
+    SUM(duration_sec) AS total
 FROM
     tracking
 WHERE
@@ -59,55 +54,62 @@ func (q *Queries) GetDurationForToday(ctx context.Context) (GetDurationForTodayR
 	return i, err
 }
 
-const getLimits = `-- name: GetLimits :many
+const getWeekdayLimit = `-- name: GetWeekdayLimit :one
 SELECT
-    id, weekday, limit_sec, created_at, updated_at
+    id, weekday, limit_minutes, updated_at
 FROM
-    limits
+    weekday_limits
+WHERE
+    weekday = strftime('%w', 'now')
 `
 
-func (q *Queries) GetLimits(ctx context.Context) ([]Limit, error) {
-	rows, err := q.db.QueryContext(ctx, getLimits)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Limit
-	for rows.Next() {
-		var i Limit
-		if err := rows.Scan(
-			&i.ID,
-			&i.Weekday,
-			&i.LimitSec,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetWeekdayLimit(ctx context.Context) (WeekdayLimit, error) {
+	row := q.db.QueryRowContext(ctx, getWeekdayLimit)
+	var i WeekdayLimit
+	err := row.Scan(
+		&i.ID,
+		&i.Weekday,
+		&i.LimitMinutes,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
-const insertTrackingRecord = `-- name: InsertTrackingRecord :one
+const newTrackingRecord = `-- name: NewTrackingRecord :one
 INSERT INTO
     tracking(created_at, updated_at)
 VALUES
-    (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id, duration_ms, created_at, updated_at
+    (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id, duration_sec, created_at, updated_at
 `
 
-func (q *Queries) InsertTrackingRecord(ctx context.Context) (Tracking, error) {
-	row := q.db.QueryRowContext(ctx, insertTrackingRecord)
+func (q *Queries) NewTrackingRecord(ctx context.Context) (Tracking, error) {
+	row := q.db.QueryRowContext(ctx, newTrackingRecord)
 	var i Tracking
 	err := row.Scan(
 		&i.ID,
-		&i.DurationMs,
+		&i.DurationSec,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateTrackingDuration = `-- name: UpdateTrackingDuration :one
+UPDATE
+    tracking
+SET
+    duration_sec = unixepoch('now') - unixepoch(created_at),
+    updated_at = CURRENT_TIMESTAMP
+WHERE
+    id = ? RETURNING id, duration_sec, created_at, updated_at
+`
+
+func (q *Queries) UpdateTrackingDuration(ctx context.Context, id int64) (Tracking, error) {
+	row := q.db.QueryRowContext(ctx, updateTrackingDuration, id)
+	var i Tracking
+	err := row.Scan(
+		&i.ID,
+		&i.DurationSec,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
