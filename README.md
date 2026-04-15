@@ -4,7 +4,7 @@ A screen time tracking and limiting daemon for Linux desktops, inspired by [time
 
 ## Features
 
-- Per-weekday screen time limits
+- Per-weekday screen time limits with per-date overrides
 - Automatic screen lock detection (pauses tracking while locked)
 - Desktop notifications when approaching the time limit
 - Automatic logout when the limit is exceeded
@@ -20,21 +20,26 @@ A screen time tracking and limiting daemon for Linux desktops, inspired by [time
 ## Build
 
 ```sh
-go build -o gotimekpr ./cmd/gotimekpr
+./build.sh
 ```
 
-No CGO is required — the project uses a pure Go SQLite driver.
+Or manually:
+
+```sh
+CGO_ENABLED=0 go build -o gotimekpr ./cmd/gotimekpr
+```
+
+No CGO required, we use the modernc.org/sqlite driver.
 
 ## Install
 
-Copy the binary and enable the systemd user service:
+Use the built-in install command:
 
 ```sh
-cp gotimekpr ~/.local/bin/
-cp gotimekpr.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now gotimekpr
+./gotimekpr install
 ```
+
+This copies the binary to `~/.local/bin/`, installs the systemd user service, and enables it.
 
 ## Usage
 
@@ -44,13 +49,32 @@ gotimekpr daemon
 
 # Run without automatic logout (for testing)
 gotimekpr daemon --no-logout
+
+# Show today's usage
+gotimekpr usage
+
+# Show today's limit
+gotimekpr limits get
+
+# Set today's limit to 2 hours
+gotimekpr limits set 2h
+
+# Add 30 minutes to today's limit
+gotimekpr limits add 30m
+
+# Enable debug logging
+gotimekpr --debug daemon
 ```
+
+The `--no-logout` flag and `--debug` flag can also be set via the `GOTIMEKPR_NO_LOGOUT` and `GOTIMEKPR_DEBUG` environment variables.
 
 ## Configuration
 
-The database and configuration are stored in `~/.config/gotimekpr/`. The directory is created automatically on first run.
+The database is stored in `~/.local/state/gotimekpr/gotimekpr.db`. The directory is created automatically on first run.
 
-Screen time limits are configured per weekday in the `limits` table of the SQLite database (`~/.config/gotimekpr/gotimekpr.db`). Set `duration_ms` to the allowed milliseconds per day, or `-1` for no limit.
+Screen time limits are configured per weekday in the `weekday_limits` table. Set `limit_minutes` to the allowed minutes per day, or `-1` for no limit. All weekdays default to `-1` (unlimited).
+
+Per-date overrides can be set in the `date_limits` table, which take priority over weekday limits. The `limits set` and `limits add` commands operate on today's date limit.
 
 | Weekday | Value |
 |---------|-------|
@@ -68,14 +92,14 @@ Install [modd](https://github.com/cortesi/modd) for live-reload during developme
 modd
 ```
 
-This watches for file changes, regenerates SQL code with `sqlc`, and restarts the daemon with `--no-logout`.
+This watches for file changes, regenerates SQL code with [sqlc](https://sqlc.dev), and restarts the daemon with `--no-logout`.
 
 ## How It Works
 
-1. The daemon polls every 5 seconds
-2. Checks if the screen is locked via D-Bus — skips tracking if locked
+1. The daemon polls every 3 seconds
+2. Checks if the screen is locked via D-Bus and skips tracking if locked
 3. Records active screen time in a local SQLite database
-4. Compares daily totals against the configured limit for the current weekday
+4. Compares daily totals against the configured limit for the current weekday (or date override)
 5. Sends a notification when less than 60 seconds remain
 6. Logs out the user when the limit is exceeded
 
