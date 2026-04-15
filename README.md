@@ -1,10 +1,6 @@
-<table align="center">
-<tr>
-<td align="center" width="9999">
+<p align="center">
   <img src="logo.png" alt="a gophger tracking screentime with a stopwatch" width="300"/>
-</td>
-</tr>
-</table>
+</p>
 
 # gotimekpr
 
