@@ -13,13 +13,25 @@ type Config struct {
 	NoLogout         bool          `yaml:"no_logout"`
 }
 
+func getXdgStateDir() (string, error) {
+	stateDir := os.Getenv("XDG_STATE_HOME")
+	if stateDir != "" {
+		return stateDir, nil
+	}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".local", "state"), nil
+}
+
 func LoadConfig() (Config, error) {
-	configDir, err := os.UserConfigDir()
+	stateDir, err := getXdgStateDir()
 	if err != nil {
 		return Config{}, err
 	}
 
-	dbDir := filepath.Join(configDir, "gotimekpr")
+	dbDir := filepath.Join(stateDir, "gotimekpr")
 	os.MkdirAll(dbDir, 0750)
 	dbURL := "file:" + filepath.Join(dbDir, "gotimekpr.db") + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	return Config{

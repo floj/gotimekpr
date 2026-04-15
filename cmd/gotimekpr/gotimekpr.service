@@ -5,6 +5,8 @@ After=graphical-session.target
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/gotimekpr daemon
+# Environment=GOTIMEKPR_DEBUG=true
+# Environment=GOTIMEKPR_NO_LOGOUT=true
 Restart=on-failure
 RestartSec=5
 

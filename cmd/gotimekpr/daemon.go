@@ -15,8 +15,9 @@ func cmdDaemon() *cli.Command {
 		Usage: "run the daemon",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:  "no-logout",
-				Usage: "if true, the daemon will not log out the user when the limit is exceeded, useful for testing and debugging.",
+				Name:    "no-logout",
+				Usage:   "if true, the daemon will not log out the user when the limit is exceeded, useful for testing and debugging.",
+				Sources: cli.EnvVars("GOTIMEKPR_NO_LOGOUT"),
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -27,7 +28,7 @@ func cmdDaemon() *cli.Command {
 			}
 			conf.NoLogout = c.Bool("no-logout")
 
-			slog.Info("starting daemon", "db", conf.DBURL)
+			slog.Info("starting daemon", "config", conf)
 			d, err := daemon.NewDaemon(ctx, conf)
 			if err != nil {
 				return err
