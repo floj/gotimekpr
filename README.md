@@ -71,13 +71,16 @@ gotimekpr daemon --no-logout
 gotimekpr usage
 
 # Show today's limit
-gotimekpr limits get
+gotimekpr limits
 
 # Set today's limit to 2 hours
 gotimekpr limits set 2h
 
-# Add 30 minutes to today's limit
+# Add 30 minutes on top of today's limit
 gotimekpr limits add 30m
+
+# Print version info
+gotimekpr version
 
 # Enable debug logging
 gotimekpr --debug daemon
