@@ -1,18 +1,27 @@
+<table align="center">
+<tr>
+<td align="center" width="9999">
+  <img src="logo.png" alt="a gophger tracking screentime with a stopwatch" width="300"/>
+</td>
+</tr>
+</table>
+
 # gotimekpr
 
-A screen time tracking and limiting daemon for Linux desktops, inspired by [timekpr-next](https://launchpad.net/timekpr-next). It monitors active screen usage and enforces configurable daily time limits per weekday, logging out users when their allocated time is exceeded.
+A screen time tracking and limiting daemon for Linux desktops, inspired by [timekpr-next](https://mjasnik.gitlab.io/timekpr-next/). Monitors active screen usage and enforces configurable daily time limits per weekday, logging out users when their allowed time is exceeded.
 
 ## Motivation
 
-I used [timekpr-next](https://launchpad.net/timekpr-next) to limit my 13-year-old's screen time. He's really into Minecraft and recently heard that Bazzite Linux is *the* best distro for gaming. Being the supportive dad I am, I encouraged him to try it out, and we installed it on his PC. Father of the year, right?
+I used [timekpr-next](https://mjasnik.gitlab.io/timekpr-next/) to limit my 13-year-old's screen time. He's really into Minecraft and recently heard that Bazzite Linux is _the_ best distro for gaming. Being the supportive dad I am, I encouraged him to try it out, and we installed it on his PC. Father of the year, right?
 
 Plot twist: Bazzite is based on ostree, and there's no easy way to install timekpr-next. So in a classic case of "I'll just write my own," I spent some hours building a stripped-down version of timekpr-next in Go. It runs entirely out of the user's home directory and keeps all its state there. No root required and works nicely with ostree's read-only root fs. Peak parental engineering.
 
 Now, if he figures out that he can:
-- stop the systemd user service himself
-- tweak the limits via the CLI or just go full hacker mode with `sqlite3`
 
-...then honestly, it's fine and I'll be proud he figured it out. But until that day comes, the screen time throne is mine again.
+- stop the systemd user service himself
+- tweak the limits via the CLI or go full hacker mode with `sqlite3`
+
+then honestly, it's fine and I'll be proud how smart he is. But until that day comes, the screen time throne is mine again.
 
 ## Features
 
@@ -41,7 +50,7 @@ Or manually:
 CGO_ENABLED=0 go build -o gotimekpr ./cmd/gotimekpr
 ```
 
-No CGO required, we use the modernc.org/sqlite driver.
+No CGO required, we use the [modernc.org/sqlite](https://modernc.org/sqlite) driver.
 
 ## Install
 
@@ -88,13 +97,13 @@ Screen time limits are configured per weekday in the `weekday_limits` table. Set
 
 Per-date overrides can be set in the `date_limits` table, which take priority over weekday limits. The `limits set` and `limits add` commands operate on today's date limit.
 
-| Weekday | Value |
-|---------|-------|
-| Sunday  | 0     |
-| Monday  | 1     |
-| Tuesday | 2     |
-| ...     | ...   |
-| Saturday| 6     |
+| Weekday  | Value |
+| -------- | ----- |
+| Sunday   | 0     |
+| Monday   | 1     |
+| Tuesday  | 2     |
+| ...      | ...   |
+| Saturday | 6     |
 
 ## Development
 
