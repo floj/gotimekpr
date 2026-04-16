@@ -11,30 +11,35 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+func withQuotaManager(fn func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error) cli.ActionFunc {
+	return func(ctx context.Context, c *cli.Command) error {
+		conf, err := config.LoadConfig()
+		if err != nil {
+			return err
+		}
+		conf.NoLogout = c.Bool("no-logout")
+
+		dbq, db, err := db.Open(ctx, conf)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		qm := quota.NewQuotaManager(dbq)
+		return fn(ctx, c, qm)
+	}
+}
+
 func cmdLimits() *cli.Command {
 	return &cli.Command{
 		Name:    "limits",
 		Aliases: []string{"l"},
 		Usage:   "retrieves today's limit",
-		Action: func(ctx context.Context, c *cli.Command) error {
-			conf, err := config.LoadConfig()
-			if err != nil {
-				return err
-			}
-			conf.NoLogout = c.Bool("no-logout")
-
-			dbq, db, err := db.Open(ctx, conf)
-			if err != nil {
-				return err
-			}
-			defer db.Close()
-
-			qm := quota.NewQuotaManager(dbq)
+		Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
 			limit := qm.GetDateLimitToday(ctx)
-
 			fmt.Printf("limit for today: %s\n", limit)
 			return nil
-		},
+		}),
 		Commands: []*cli.Command{
 			{
 				Name:    "add",
@@ -49,32 +54,18 @@ func cmdLimits() *cli.Command {
 						},
 					},
 				},
-				Action: func(ctx context.Context, c *cli.Command) error {
+				Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
 					d, err := time.ParseDuration(c.StringArg("duration"))
 					if err != nil {
 						return err
 					}
-					conf, err := config.LoadConfig()
-					if err != nil {
-						return err
-					}
-					conf.NoLogout = c.Bool("no-logout")
-
-					dbq, db, err := db.Open(ctx, conf)
-					if err != nil {
-						return err
-					}
-					defer db.Close()
-
-					qm := quota.NewQuotaManager(dbq)
-
 					limit, err := qm.AddToDateLimitToday(ctx, d)
 					if err != nil {
 						return err
 					}
 					fmt.Printf("new limit for today: %s\n", limit)
 					return nil
-				},
+				}),
 			},
 			{
 				Name:    "set",
@@ -89,32 +80,18 @@ func cmdLimits() *cli.Command {
 						},
 					},
 				},
-				Action: func(ctx context.Context, c *cli.Command) error {
+				Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
 					d, err := time.ParseDuration(c.StringArg("duration"))
 					if err != nil {
 						return err
 					}
-					conf, err := config.LoadConfig()
-					if err != nil {
-						return err
-					}
-					conf.NoLogout = c.Bool("no-logout")
-
-					dbq, db, err := db.Open(ctx, conf)
-					if err != nil {
-						return err
-					}
-					defer db.Close()
-
-					qm := quota.NewQuotaManager(dbq)
-
 					limit, err := qm.SetDateLimitToday(ctx, d)
 					if err != nil {
 						return err
 					}
 					fmt.Printf("new limit for today: %s\n", limit)
 					return nil
-				},
+				}),
 			},
 		}}
 

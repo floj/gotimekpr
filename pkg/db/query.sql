@@ -8,7 +8,7 @@ VALUES
 UPDATE
     tracking
 SET
-    duration_sec = unixepoch('now') - unixepoch(created_at),
+    duration_sec = unixepoch('now', 'localtime') - unixepoch(created_at, 'localtime'),
     updated_at = CURRENT_TIMESTAMP
 WHERE
     id = ? RETURNING *;
@@ -20,7 +20,7 @@ SELECT
 FROM
     tracking
 WHERE
-    DATE(created_at) = DATE('now');
+    DATE(created_at, 'localtime') = DATE('now', 'localtime');
 
 -- name: GetWeekdayLimitToday :one
 SELECT
@@ -42,7 +42,7 @@ WHERE
 INSERT INTO
     date_limits(limit_date, limit_minutes)
 VALUES
-    (DATE('now'), ?) ON CONFLICT(limit_date) DO
+    (DATE('now', 'localtime'), ?) ON CONFLICT(limit_date) DO
 UPDATE
 SET
     limit_minutes = limit_minutes + excluded.limit_minutes,
@@ -62,4 +62,4 @@ SET
 DELETE FROM
     date_limits
 WHERE
-    DATE(limit_date) = DATE('now');
+    DATE(limit_date, 'localtime') = DATE('now', 'localtime');

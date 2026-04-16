@@ -18,9 +18,9 @@ func New(conn *dbus.Conn) (DesktopEnv, error) {
 	flvr := flavor()
 	switch flvr {
 	case GNOME:
-		return &gnomeDesktopEnv{}, nil
+		return &gnomeDesktopEnv{conn: conn}, nil
 	case KDE:
-		return &kdeDesktopEnv{}, nil
+		return &kdeDesktopEnv{conn: conn}, nil
 	default:
 		return nil, fmt.Errorf("unsupported desktop environment: %s", flvr)
 	}

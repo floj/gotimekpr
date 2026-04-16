@@ -7,10 +7,10 @@ import (
 )
 
 type Config struct {
-	DBURL            string        `yaml:"db_url"`
-	TrackingInterval time.Duration `yaml:"tracking_interval"`
-	NotifyBefore     time.Duration `yaml:"notify_before"`
-	NoLogout         bool          `yaml:"no_logout"`
+	DBURL            string
+	TrackingInterval time.Duration
+	NotifyBefore     time.Duration
+	NoLogout         bool
 }
 
 func getXdgStateDir() (string, error) {
@@ -32,7 +32,10 @@ func LoadConfig() (Config, error) {
 	}
 
 	dbDir := filepath.Join(stateDir, "gotimekpr")
-	os.MkdirAll(dbDir, 0750)
+	if err := os.MkdirAll(dbDir, 0750); err != nil {
+		return Config{}, err
+	}
+
 	dbURL := "file:" + filepath.Join(dbDir, "gotimekpr.db") + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	return Config{
 		DBURL:            dbURL,

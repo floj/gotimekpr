@@ -17,6 +17,14 @@ var systemdService string
 
 func cmdInstall() *cli.Command {
 
+	getSelfPath := func() (string, error) {
+		exePath, err := os.Executable()
+		if err != nil {
+			return "", err
+		}
+		return filepath.EvalSymlinks(exePath)
+	}
+
 	copyBin := func() error {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -28,7 +36,17 @@ func cmdInstall() *cli.Command {
 		}
 		executablePath := filepath.Join(localBinDir, "gotimekpr")
 		// copy the currently running executable to the local bin directory
-		src, err := os.Open(os.Args[0])
+
+		// check if os.Args[0] is the same as the target path, if so, skip copying
+		selfPath, err := getSelfPath()
+		if err != nil {
+			return err
+		}
+		if selfPath == executablePath {
+			return nil
+		}
+
+		src, err := os.Open(selfPath)
 		if err != nil {
 			return err
 		}
@@ -66,11 +84,22 @@ func cmdInstall() *cli.Command {
 		return nil
 	}
 
+	runCmd := func(ctx context.Context, name string, args ...string) error {
+		cmd := exec.CommandContext(ctx, name, args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
 	return &cli.Command{
 		Name:    "install",
 		Aliases: []string{"i"},
 		Usage:   "installs the gotimekpr systemd user service and starts it",
 		Action: func(ctx context.Context, c *cli.Command) error {
+
+			// stop the service if it's already running, ignore errors since it might not be installed yet
+			_ = runCmd(ctx, "systemctl", "--user", "stop", "gotimekpr.service")
+
 			if err := copyBin(); err != nil {
 				return err
 			}
@@ -79,17 +108,11 @@ func cmdInstall() *cli.Command {
 				return err
 			}
 
-			cmd := exec.CommandContext(ctx, "systemctl", "--user", "enable", "gotimekpr.service")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
+			if err := runCmd(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
 				return err
 			}
 
-			cmd = exec.CommandContext(ctx, "systemctl", "--user", "start", "gotimekpr.service")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
+			if err := runCmd(ctx, "systemctl", "--user", "enable", "--now", "gotimekpr.service"); err != nil {
 				return err
 			}
 

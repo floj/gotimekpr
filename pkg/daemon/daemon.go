@@ -123,6 +123,12 @@ func (d *Daemon) Run() error {
 				}
 			}
 		case <-d.ctx.Done():
+			if lastRec.ID > 0 {
+				_, err := d.qm.TrackUpdate(context.Background(), lastRec) // final update
+				if err != nil {
+					slog.Error("failed to update final tracking record", "error", err)
+				}
+			}
 			slog.Info("shutting down daemon")
 			return nil
 		}
