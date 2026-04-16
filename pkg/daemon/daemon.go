@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +10,7 @@ import (
 	"github.com/floj/gotimekpr/pkg/config"
 	"github.com/floj/gotimekpr/pkg/db"
 	"github.com/floj/gotimekpr/pkg/desktopenv"
+	"github.com/floj/gotimekpr/pkg/quota"
 	"github.com/godbus/dbus/v5"
 )
 
@@ -18,12 +18,11 @@ type Daemon struct {
 	conf config.Config
 	ctx  context.Context
 	conn *dbus.Conn
-	db   *sql.DB
-	dbq  *db.Queries
-	de   *desktopenv.DesktopEnv
+	de   desktopenv.DesktopEnv
+	qm   *quota.QuotaManager
 }
 
-func NewDaemon(ctx context.Context, conf config.Config) (*Daemon, error) {
+func NewDaemon(ctx context.Context, conf config.Config, qm *quota.QuotaManager) (*Daemon, error) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		return nil, err
@@ -35,27 +34,17 @@ func NewDaemon(ctx context.Context, conf config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-	dbq, db, err := db.Open(ctx, conf)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Daemon{
 		conf: conf,
 		ctx:  ctx,
 		conn: conn,
-		db:   db,
-		dbq:  dbq,
 		de:   de,
+		qm:   qm,
 	}, nil
 }
 
 func (d *Daemon) Close() error {
 	errs := []error{}
-
-	if err := d.db.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing database: %w", err))
-	}
 
 	if err := d.conn.Close(); err != nil {
 		errs = append(errs, fmt.Errorf("error closing dbus connection: %w", err))
@@ -71,7 +60,7 @@ func (d *Daemon) track(lastRec db.Tracking) (db.Tracking, error) {
 	}
 
 	if lastRec.ID < 0 {
-		rec, err := d.dbq.NewTrackingRecord(d.ctx)
+		rec, err := d.qm.TrackNew(d.ctx)
 		if err != nil {
 			return lastRec, fmt.Errorf("error adding new tracking record: %w", err)
 		}
@@ -79,76 +68,12 @@ func (d *Daemon) track(lastRec db.Tracking) (db.Tracking, error) {
 		return rec, nil
 	}
 
-	rec, err := d.dbq.UpdateTrackingDuration(d.ctx, lastRec.ID)
+	rec, err := d.qm.TrackUpdate(d.ctx, lastRec)
 	if err != nil {
 		return lastRec, fmt.Errorf("error updating tracking record: %w", err)
 	}
 
 	return rec, nil
-}
-
-func (d *Daemon) checkUsage() (Usage, error) {
-	limit := d.getTodaysLimit()
-
-	usg := Usage{
-		Exceeded:  false,
-		Limit:     limit,
-		Used:      0,
-		Remaining: -1,
-	}
-
-	dur, err := d.dbq.GetDurationForToday(d.ctx)
-	if err != nil {
-		return usg, fmt.Errorf("failed to get duration for today: %w", err)
-	}
-
-	if dur.Count == 0 {
-		slog.Info("no tracking records for today")
-		return usg, nil
-	}
-
-	usg.Used = time.Duration(int64(dur.Total.Float64)) * time.Second
-	if limit < 0 {
-		return usg, nil
-	}
-	usg.Remaining = max(limit-usg.Used, 0)
-	usg.Exceeded = usg.Remaining <= 0
-
-	return usg, nil
-}
-
-func (d *Daemon) getTodaysLimit() time.Duration {
-	dateLimit, err := d.dbq.GetDateLimitToday(d.ctx)
-	if err == nil {
-		if dateLimit.LimitMinutes < 0 {
-			return -1
-		}
-		return time.Duration(dateLimit.LimitMinutes) * time.Minute
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		slog.Error("failed to get date limit, falling back to weekday limit", "error", err)
-	}
-
-	weekdayLimit, err := d.dbq.GetWeekdayLimitToday(d.ctx)
-	if err == nil {
-		if weekdayLimit.LimitMinutes < 0 {
-			return -1
-		}
-		return time.Duration(weekdayLimit.LimitMinutes) * time.Minute
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		slog.Error("failed to get weekday limit, using no limit", "error", err)
-		return -1
-	}
-	slog.Debug("no weekday limit set for today, using no limit")
-	return -1
-}
-
-type Usage struct {
-	Exceeded  bool
-	Used      time.Duration
-	Limit     time.Duration
-	Remaining time.Duration
 }
 
 func (d *Daemon) Run() error {
@@ -166,7 +91,7 @@ func (d *Daemon) Run() error {
 				continue
 			}
 
-			usg, err := d.checkUsage()
+			usg, err := d.qm.GetUsage(d.ctx)
 			if err != nil {
 				slog.Error("error checking limit", "error", err)
 				continue
@@ -178,7 +103,7 @@ func (d *Daemon) Run() error {
 			}
 
 			if usg.Exceeded {
-				d.de.SendNotification("You've exceeded your screen time limit for today!")
+				d.de.SendNotification("Logout", "You've exceeded your screen time limit for today!")
 				if d.conf.NoLogout {
 					slog.Info("no-logout flag is set, not logging out user")
 					continue
@@ -193,7 +118,7 @@ func (d *Daemon) Run() error {
 
 			if usg.Remaining < d.conf.NotifyBefore {
 				slog.Info("limit approaching, sending notification", "remaining", usg.Remaining)
-				if err := d.de.SendNotification(fmt.Sprintf("%s remaining - you're close to your screen time limit for today.", usg.Remaining)); err != nil {
+				if err := d.de.SendNotification("Screentime Alert", fmt.Sprintf("%s remaining - you're close to your screen time limit for today.", usg.Remaining)); err != nil {
 					slog.Error("failed to send notification", "error", err)
 				}
 			}

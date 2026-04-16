@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/floj/gotimekpr/pkg/config"
 	"github.com/floj/gotimekpr/pkg/db"
+	"github.com/floj/gotimekpr/pkg/quota"
 	"github.com/urfave/cli/v3"
 )
 
@@ -21,23 +21,19 @@ func cmdLimits() *cli.Command {
 			if err != nil {
 				return err
 			}
+			conf.NoLogout = c.Bool("no-logout")
+
 			dbq, db, err := db.Open(ctx, conf)
 			if err != nil {
 				return err
 			}
 			defer db.Close()
 
-			limit, err := dbq.GetDateLimitToday(ctx)
+			qm := quota.NewQuotaManager(dbq)
+			limit := qm.GetDateLimitToday(ctx)
 
-			if err == nil {
-				fmt.Printf("limit for today: %s\n", time.Duration(limit.LimitMinutes)*time.Minute)
-				return nil
-			}
-			if err == sql.ErrNoRows {
-				fmt.Println("no limit set for today")
-				return nil
-			}
-			return err
+			fmt.Printf("limit for today: %s\n", limit)
+			return nil
 		},
 		Commands: []*cli.Command{
 			{
@@ -62,17 +58,21 @@ func cmdLimits() *cli.Command {
 					if err != nil {
 						return err
 					}
+					conf.NoLogout = c.Bool("no-logout")
+
 					dbq, db, err := db.Open(ctx, conf)
 					if err != nil {
 						return err
 					}
 					defer db.Close()
 
-					limit, err := dbq.AddToDateLimitToday(ctx, int64(d.Minutes()))
+					qm := quota.NewQuotaManager(dbq)
+
+					limit, err := qm.AddToDateLimitToday(ctx, d)
 					if err != nil {
 						return err
 					}
-					fmt.Printf("new limit for today: %s\n", time.Duration(limit.LimitMinutes)*time.Minute)
+					fmt.Printf("new limit for today: %s\n", limit)
 					return nil
 				},
 			},
@@ -98,17 +98,21 @@ func cmdLimits() *cli.Command {
 					if err != nil {
 						return err
 					}
+					conf.NoLogout = c.Bool("no-logout")
+
 					dbq, db, err := db.Open(ctx, conf)
 					if err != nil {
 						return err
 					}
 					defer db.Close()
 
-					limit, err := dbq.SetDateLimitToday(ctx, int64(d.Minutes()))
+					qm := quota.NewQuotaManager(dbq)
+
+					limit, err := qm.SetDateLimitToday(ctx, d)
 					if err != nil {
 						return err
 					}
-					fmt.Printf("new limit for today: %s\n", time.Duration(limit.LimitMinutes)*time.Minute)
+					fmt.Printf("new limit for today: %s\n", limit)
 					return nil
 				},
 			},
