@@ -67,17 +67,30 @@ gotimekpr daemon
 # Run without automatic logout (for testing)
 gotimekpr daemon --no-logout
 
-# Show today's usage
+# Show today's usage and limit
 gotimekpr usage
 
 # Show today's limit
-gotimekpr limits
+gotimekpr limits today
 
 # Set today's limit to 2 hours
-gotimekpr limits set 2h
+gotimekpr limits today set 2h
+
+# Removes today's limit
+gotimekpr limits today set unlimited
 
 # Add 30 minutes on top of today's limit
-gotimekpr limits add 30m
+gotimekpr limits today add 30m
+
+# Show limits for all weekdays
+gotimekpr limits week
+
+# Set weekday limits (examples)
+gotimekpr limits week set 2h all           # 2 hours for all days
+gotimekpr limits week set 3h weekend       # 3 hours on weekends
+gotimekpr limits week set 1h workdays      # 1 hour on workdays
+gotimekpr limits week set unlimited mon    # unlimited on Monday
+gotimekpr limits week set 2h mon tue wed   # 2 hours Mon-Wed
 
 # Print version info
 gotimekpr version

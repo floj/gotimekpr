@@ -7,11 +7,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-var (
-	version   = "dev"
-	buildDate = "unknown"
-)
-
 func cmdVersion() *cli.Command {
 	return &cli.Command{
 		Name:    "version",

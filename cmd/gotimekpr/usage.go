@@ -18,27 +18,20 @@ func cmdUsage() *cli.Command {
 			if err != nil {
 				return err
 			}
-
-			if usg.Limit < 0 {
-				fmt.Printf("Limit     | unlimited\n")
-			} else {
-				fmt.Printf("Limit     | %s\n", usg.Limit)
-			}
-
-			fmt.Printf("Used      | %s\n", usg.Used)
-
+			remaining := "N/A"
 			if usg.Remaining >= 0 {
-				fmt.Printf("Remaining | %s\n", usg.Remaining)
-			} else {
-				fmt.Printf("Remaining | N/A\n")
+				remaining = usg.Remaining.String()
 			}
 
+			exceeded := "no"
 			if usg.Exceeded {
-				fmt.Printf("Exceeded  | yes\n")
-			} else {
-				fmt.Printf("Exceeded  | no\n")
+				exceeded = "yes"
 			}
 
+			fmt.Printf("Limit     | %s\n", quota.LimitToString(usg.Limit))
+			fmt.Printf("Used      | %s\n", usg.Used)
+			fmt.Printf("Remaining | %s\n", remaining)
+			fmt.Printf("Exceeded  | %s\n", exceeded)
 			return nil
 		}),
 	}

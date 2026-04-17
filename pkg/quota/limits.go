@@ -18,6 +18,13 @@ func ParseLimit(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
+func LimitToString(d time.Duration) string {
+	if d < 0 {
+		return "unlimited"
+	}
+	return d.String()
+}
+
 func limitToMinutes(d time.Duration) int64 {
 	if d < 0 {
 		return -1

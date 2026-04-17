@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"io"
+	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	_ "embed"
@@ -80,34 +80,31 @@ func cmdInstall() *cli.Command {
 		return nil
 	}
 
-	runCmd := func(ctx context.Context, name string, args ...string) error {
-		cmd := exec.CommandContext(ctx, name, args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-
 	return &cli.Command{
 		Name:    "install",
 		Aliases: []string{"i"},
 		Usage:   "installs the gotimekpr systemd user service and starts it",
 		Action: func(ctx context.Context, c *cli.Command) error {
-
 			// stop the service if it's already running, ignore errors since it might not be installed yet
+			slog.Info("stopping gotimekpr.service if it's already running")
 			_ = runCmd(ctx, "systemctl", "--user", "stop", "gotimekpr.service")
 
+			slog.Info("copying executable to local bin directory")
 			if err := copyBin(); err != nil {
 				return err
 			}
 
+			slog.Info("copying systemd service file")
 			if err := copySystemdService(); err != nil {
 				return err
 			}
 
+			slog.Info("reloading systemd user daemon")
 			if err := runCmd(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
 				return err
 			}
 
+			slog.Info("enabling and starting gotimekpr.service")
 			if err := runCmd(ctx, "systemctl", "--user", "enable", "--now", "gotimekpr.service"); err != nil {
 				return err
 			}

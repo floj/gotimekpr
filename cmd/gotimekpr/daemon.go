@@ -37,7 +37,7 @@ func cmdDaemon() *cli.Command {
 
 			qm := quota.NewQuotaManager(dbq)
 
-			slog.Info("starting daemon", "config", conf)
+			slog.Info("starting daemon", "version", version, "buildDate", buildDate, "config", conf)
 			d, err := daemon.NewDaemon(ctx, conf, qm)
 			if err != nil {
 				return err

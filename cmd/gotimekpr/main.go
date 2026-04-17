@@ -5,12 +5,25 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"time"
 
 	"github.com/lmittmann/tint"
 	"github.com/urfave/cli/v3"
 )
+
+var (
+	version   = "dev"
+	buildDate = "unknown"
+)
+
+var runCmd = func(ctx context.Context, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
 
 func main() {
 	cmd := &cli.Command{
@@ -29,6 +42,7 @@ func main() {
 			cmdUsage(),
 			cmdInstall(),
 			cmdVersion(),
+			cmdLogs(),
 		},
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 			lvl := slog.LevelInfo

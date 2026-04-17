@@ -29,35 +29,24 @@ func withQuotaManager(fn func(ctx context.Context, c *cli.Command, qm *quota.Quo
 	}
 }
 
-func subcommandsWeek() []*cli.Command {
-	printWeekdayLimits := func(ctx context.Context, qm *quota.QuotaManager) error {
-		orderStartMonday := []int64{1, 2, 3, 4, 5, 6, 0}
-		limit, err := qm.GetWeekdayLimits(ctx)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Weekly limits\n")
-		fmt.Printf("----------------------\n")
-
-		for _, idx := range orderStartMonday {
-			l := limit[idx]
-			ls := "unlimited"
-			if l.Duration >= 0 {
-				ls = l.Duration.String()
-			}
-			fmt.Printf("%-10s | %s\n", l.WeekdayName(), ls)
-		}
-		return nil
+func printWeekdayLimits(ctx context.Context, qm *quota.QuotaManager) error {
+	orderStartMonday := []int64{1, 2, 3, 4, 5, 6, 0}
+	limit, err := qm.GetWeekdayLimits(ctx)
+	if err != nil {
+		return err
 	}
+	fmt.Printf("Weekly limits\n")
+	fmt.Printf("----------------------\n")
 
+	for _, idx := range orderStartMonday {
+		l := limit[idx]
+		fmt.Printf("%-10s | %s\n", l.WeekdayName(), quota.LimitToString(l.Duration))
+	}
+	return nil
+}
+
+func subcommandsWeek() []*cli.Command {
 	return []*cli.Command{
-		{
-			Name:  "get",
-			Usage: "Show the limits for all weekdays",
-			Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
-				return printWeekdayLimits(ctx, qm)
-			}),
-		},
 		{
 			Name:      "set",
 			Usage:     "Set the limits of one or more weekdays",
@@ -158,21 +147,24 @@ func cmdLimits() *cli.Command {
 	return &cli.Command{
 		Name:    "limits",
 		Aliases: []string{"l"},
-		Usage:   "retrieves today's limit",
-		Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
-			limit := qm.GetDateLimitToday(ctx)
-			fmt.Printf("limit for today: %s\n", limit)
-			return nil
-		}),
+		Usage:   "manage time limits",
 		Commands: []*cli.Command{
 			{
-				Name:     "today",
-				Usage:    "Manage the limit for today",
+				Name:  "today",
+				Usage: "show and manage today's limit",
+				Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
+					limit := qm.GetDateLimitToday(ctx)
+					fmt.Printf("limit for today: %s\n", limit)
+					return nil
+				}),
 				Commands: subcommandsToday(),
 			},
 			{
-				Name:     "week",
-				Usage:    "Manage the limit for individual weekdays",
+				Name:  "week",
+				Usage: "show and manage the limits per weekday",
+				Action: withQuotaManager(func(ctx context.Context, c *cli.Command, qm *quota.QuotaManager) error {
+					return printWeekdayLimits(ctx, qm)
+				}),
 				Commands: subcommandsWeek(),
 			},
 		},
