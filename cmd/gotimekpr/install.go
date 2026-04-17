@@ -16,15 +16,6 @@ import (
 var systemdService string
 
 func cmdInstall() *cli.Command {
-
-	getSelfPath := func() (string, error) {
-		exePath, err := os.Executable()
-		if err != nil {
-			return "", err
-		}
-		return filepath.EvalSymlinks(exePath)
-	}
-
 	copyBin := func() error {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
@@ -37,11 +28,16 @@ func cmdInstall() *cli.Command {
 		executablePath := filepath.Join(localBinDir, "gotimekpr")
 		// copy the currently running executable to the local bin directory
 
-		// check if os.Args[0] is the same as the target path, if so, skip copying
-		selfPath, err := getSelfPath()
+		// check if we are running in the same path as the target path, if so, skip copying
+		selfPath, err := os.Executable()
 		if err != nil {
 			return err
 		}
+		selfPath, err = filepath.EvalSymlinks(selfPath)
+		if err != nil {
+			return err
+		}
+
 		if selfPath == executablePath {
 			return nil
 		}

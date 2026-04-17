@@ -8,13 +8,14 @@ package db
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const addToDateLimitToday = `-- name: AddToDateLimitToday :one
 INSERT INTO
     date_limits(limit_date, limit_minutes)
 VALUES
-    (DATE('now'), ?) ON CONFLICT(limit_date) DO
+    (DATE('now', 'localtime'), ?) ON CONFLICT(limit_date) DO
 UPDATE
 SET
     limit_minutes = limit_minutes + excluded.limit_minutes,
@@ -63,7 +64,7 @@ SELECT
 FROM
     tracking
 WHERE
-    DATE(created_at) = DATE('now')
+    DATE(created_at, 'localtime') = DATE('now', 'localtime')
 `
 
 type GetDurationForTodayRow struct {
@@ -99,6 +100,43 @@ func (q *Queries) GetWeekdayLimitToday(ctx context.Context) (WeekdayLimit, error
 	return i, err
 }
 
+const getWeekdayLimits = `-- name: GetWeekdayLimits :many
+SELECT
+    id, weekday, limit_minutes, updated_at
+FROM
+    weekday_limits
+ORDER BY
+    weekday
+`
+
+func (q *Queries) GetWeekdayLimits(ctx context.Context) ([]WeekdayLimit, error) {
+	rows, err := q.db.QueryContext(ctx, getWeekdayLimits)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WeekdayLimit
+	for rows.Next() {
+		var i WeekdayLimit
+		if err := rows.Scan(
+			&i.ID,
+			&i.Weekday,
+			&i.LimitMinutes,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const newTrackingRecord = `-- name: NewTrackingRecord :one
 INSERT INTO
     tracking(created_at, updated_at)
@@ -122,7 +160,7 @@ const removeDateLimitToday = `-- name: RemoveDateLimitToday :exec
 DELETE FROM
     date_limits
 WHERE
-    DATE(limit_date) = DATE('now')
+    DATE(limit_date, 'localtime') = DATE('now', 'localtime')
 `
 
 func (q *Queries) RemoveDateLimitToday(ctx context.Context) error {
@@ -154,11 +192,42 @@ func (q *Queries) SetDateLimitToday(ctx context.Context, limitMinutes int64) (Da
 	return i, err
 }
 
+const setWeekdayLimits = `-- name: SetWeekdayLimits :exec
+UPDATE
+    weekday_limits
+SET
+    limit_minutes = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE
+    weekday IN (/*SLICE:weekdays*/?)
+`
+
+type SetWeekdayLimitsParams struct {
+	LimitMinutes int64
+	Weekdays     []int64
+}
+
+func (q *Queries) SetWeekdayLimits(ctx context.Context, arg SetWeekdayLimitsParams) error {
+	query := setWeekdayLimits
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.LimitMinutes)
+	if len(arg.Weekdays) > 0 {
+		for _, v := range arg.Weekdays {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:weekdays*/?", strings.Repeat(",?", len(arg.Weekdays))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:weekdays*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
 const updateTrackingDuration = `-- name: UpdateTrackingDuration :one
 UPDATE
     tracking
 SET
-    duration_sec = unixepoch('now') - unixepoch(created_at),
+    duration_sec = unixepoch('now', 'localtime') - unixepoch(created_at, 'localtime'),
     updated_at = CURRENT_TIMESTAMP
 WHERE
     id = ? RETURNING id, duration_sec, created_at, updated_at

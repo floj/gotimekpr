@@ -30,6 +30,23 @@ FROM
 WHERE
     weekday = strftime('%w', 'now');
 
+-- name: SetWeekdayLimits :exec
+UPDATE
+    weekday_limits
+SET
+    limit_minutes = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE
+    weekday IN (sqlc.slice('weekdays'));
+
+-- name: GetWeekdayLimits :many
+SELECT
+    *
+FROM
+    weekday_limits
+ORDER BY
+    weekday;
+
 -- name: GetDateLimitToday :one
 SELECT
     *
