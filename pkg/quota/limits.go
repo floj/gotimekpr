@@ -78,11 +78,9 @@ func (qm *QuotaManager) GetDateLimitToday(ctx context.Context) time.Duration {
 }
 
 func (qm *QuotaManager) AddToDateLimitToday(ctx context.Context, d time.Duration) (time.Duration, error) {
-	limit, err := qm.dbq.AddToDateLimitToday(ctx, limitToMinutes(d))
-	if err != nil {
-		return -1, fmt.Errorf("failed to add to date limit: %w", err)
-	}
-	return time.Duration(limit.LimitMinutes) * time.Minute, nil
+	limit := qm.GetDateLimitToday(ctx)
+	newLimit := max(limit+d, -1)
+	return qm.SetDateLimitToday(ctx, newLimit)
 }
 
 func (qm *QuotaManager) SetDateLimitToday(ctx context.Context, d time.Duration) (time.Duration, error) {

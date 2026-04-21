@@ -11,30 +11,6 @@ import (
 	"strings"
 )
 
-const addToDateLimitToday = `-- name: AddToDateLimitToday :one
-INSERT INTO
-    date_limits(limit_date, limit_minutes)
-VALUES
-    (DATE('now', 'localtime'), ?) ON CONFLICT(limit_date) DO
-UPDATE
-SET
-    limit_minutes = limit_minutes + excluded.limit_minutes,
-    updated_at = CURRENT_TIMESTAMP RETURNING id, limit_date, limit_minutes, created_at, updated_at
-`
-
-func (q *Queries) AddToDateLimitToday(ctx context.Context, limitMinutes int64) (DateLimit, error) {
-	row := q.db.QueryRowContext(ctx, addToDateLimitToday, limitMinutes)
-	var i DateLimit
-	err := row.Scan(
-		&i.ID,
-		&i.LimitDate,
-		&i.LimitMinutes,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getDateLimitToday = `-- name: GetDateLimitToday :one
 SELECT
     id, limit_date, limit_minutes, created_at, updated_at

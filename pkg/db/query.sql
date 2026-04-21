@@ -55,16 +55,6 @@ FROM
 WHERE
     DATE(limit_date) = DATE('now');
 
--- name: AddToDateLimitToday :one
-INSERT INTO
-    date_limits(limit_date, limit_minutes)
-VALUES
-    (DATE('now', 'localtime'), ?) ON CONFLICT(limit_date) DO
-UPDATE
-SET
-    limit_minutes = limit_minutes + excluded.limit_minutes,
-    updated_at = CURRENT_TIMESTAMP RETURNING *;
-
 -- name: SetDateLimitToday :one
 INSERT INTO
     date_limits(limit_date, limit_minutes)
